@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Personal Finance Chatbot — All-in-One</title>
+  <meta name="description" content="Single-file Personal Finance Chatbot (UI + simulated AI). Save as .html and open in browser." />
+  <style>
+    :root{ --bg:#0f1724; --card:#0b1220; --muted:#99a7c7; --text:#e6eef9; --accent:#06b6d4; --glass: rgba(255,255,255,0.03); --radius:12px; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#071124 0%, #0b1220 100%);color:var(--text);min-height:100vh;}
+    .app{max-width:1100px;margin:28px auto;padding:20px;display:grid;grid-template-columns:380px 1fr;gap:18px}
+    header{grid-column:1/3;display:flex;align-items:center;justify-content:space-between}
+    header h1{margin:0;font-size:20px}
+    .card{background:var(--card);padding:14px;border-radius:var(--radius);box-shadow:0 8px 30px rgba(2,6,23,.6)}
+    /* left column */
+    .left{display:flex;flex-direction:column;gap:12px}
+    .profile{display:flex;gap:12px;align-items:center}
+    .avatar{width:58px;height:58px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700}
+    label.select{display:flex;gap:8px;align-items:center}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{background:linear-gradient(90deg,var(--accent),#8b5cf6);border:none;color:white;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    /* right column - chat & tools */
+    .chat{display:flex;flex-direction:column;height:66vh}
+    .messages{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+    .msg{max-width:78%;padding:10px;border-radius:10px}
+    .msg.user{align-self:flex-end;background:linear-gradient(180deg,#122436,#0e2540)}
+    .msg.bot{align-self:flex-start;background:rgba(255,255,255,0.03)}
+    .composer{display:flex;gap:8px;padding:10px}
+    input[type=text], textarea{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text)}
+    /* tools */
+    .tool-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .tool{padding:10px;border-radius:10px;background:var(--glass)}
+    .small{font-size:13px;color:var(--muted)}
+    footer{grid-column:1/3;text-align:center;color:var(--muted);font-size:13px;margin-top:8px}
+    pre{white-space:pre-wrap}
+    /* responsive */
+    @media (max-width:920px){.app{grid-template-columns:1fr;}.chat{height:60vh}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Personal Finance Chatbot — Demo (client-only)</h1>
+      <div class="small">Status: <strong id="status">Local demo (no IBM connected)</strong></div>
+    </header>
+
+    <div class="left">
+      <div class="card profile">
+        <div class="avatar" id="avatar">PF</div>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div id="username" style="font-weight:700">Guest User</div>
+              <div class="small" id="useremail">No profile loaded</div>
+            </div>
+            <div style="text-align:right">
+              <div class="small">User type</div>
+              <select id="userType">
+                <option value="student">Student</option>
+                <option value="professional" selected>Professional</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn" id="saveProfile">Save Profile</button>
+            <button class="btn secondary" id="loadDemo">Load Demo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Budget Builder</h3>
+        <div class="small">Enter monthly income and expenses (category + amount)</div>
+        <div style="margin-top:8px">
+          <input id="income" type="text" placeholder="Monthly income (e.g. 4000)" />
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <input id="catName" type="text" placeholder="Category (Food, Rent)" />
+            <input id="catAmt" type="text" placeholder="Amount" />
+            <button class="btn" id="addCat">Add</button>
+          </div>
+          <ol id="cats" style="margin-top:8px" class="small"></ol>
+          <div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="summary">Generate Summary</button><button class="btn secondary" id="clearCats">Clear</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Data Controls</h3>
+        <div class="small">Save / Export / Import your profile & budget</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" id="export">Export JSON</button>
+          <button class="btn secondary" id="importBtn">Import JSON</button>
+        </div>
+        <input type="file" id="importFile" style="display:none" accept="application/json" />
+      </div>
+
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0">Chat</h2>
+        <div class="small">Tip: you can ask about savings, taxes, investments, or budgeting</div>
+      </div>
+
+      <div class="chat">
+        <div class="messages" id="messages" aria-live="polite"></div>
+        <div class="composer">
+          <input id="userInput" type="text" placeholder="Ask: e.g. 'How much should I save this month?'" />
+          <button class="btn" id="send">Send</button>
+          <button class="btn secondary" id="clearChat">Clear</button>
+        </div>
+      </div>
+
+      <div class="tool-list">
+        <div class="tool">
+          <h4 style="margin:0">Quick Tools</h4>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" id="calcBtn">Calculator</button>
+            <button class="btn" id="taxBtn">Tax Estimator</button>
+            <button class="btn" id="insightsBtn">Spending Insights</button>
+          </div>
+          <div id="toolOutput" class="small" style="margin-top:8px"></div>
+        </div>
+
+        <div class="tool">
+          <h4 style="margin:0">Integration</h4>
+          <div class="small" style="margin-top:8px">This demo is client-only. To connect IBM Watson or other generative models, follow the commented guidance inside the source code—server-side credentials are required.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <footer class="small">Save this file as <code>personal-finance-chatbot.html</code> and open it in your browser. All data is stored locally in your browser.</footer>
+  </div>
+
+  <script>
+  /* ---------- Simple local state ---------- */
+  const state = {
+    user: {name:'Guest User', email:'', type:'professional'},
+    income: 0,
+    categories: [],
+    messages: []
+  }
+
+  const $ = id=>document.getElementById(id)
+
+  // initialize UI
+  function renderCats(){
+    const ol = $('cats'); ol.innerHTML=''
+    state.categories.forEach((c, i)=>{
+      const li = document.createElement('li'); li.textContent = c.name + ' — ' + formatMoney(c.amount)
+      const rm = document.createElement('button'); rm.textContent='✕'; rm.style.marginLeft='8px'; rm.className='btn secondary'; rm.style.padding='3px 6px'; rm.onclick=()=>{state.categories.splice(i,1);renderCats()}
+      li.appendChild(rm); ol.appendChild(li)
+    })
+  }
+
+  function formatMoney(n){n=Number(n)||0; return (n).toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:2})}
+
+  $('addCat').onclick = ()=>{
+    const name = $('catName').value.trim(); const amt = Number($('catAmt').value.trim());
+    if(!name||!amt){alert('Provide category and numeric amount');return}
+    state.categories.push({name,amount:amt}); $('catName').value='';$('catAmt').value=''; renderCats();
+  }
+  $('clearCats').onclick = ()=>{state.categories=[];renderCats()}
+
+  $('summary').onclick = ()=>{
+    const income = Number($('income').value.trim())||0; state.income = income
+    const totalExpenses = state.categories.reduce((s,c)=>s+c.amount,0)
+    const savings = Math.max(0,income-totalExpenses)
+    // create a budget summary message and add to chat
+    const summary = `Budget Summary:\nIncome: ${formatMoney(income)}\nExpenses total: ${formatMoney(totalExpenses)}\nEstimated monthly savings: ${formatMoney(savings)}\nBreakdown:\n${state.categories.map(c=>` - ${c.name}: ${formatMoney(c.amount)}`).join('\n')}`
+    appendBotMessage(summary)
+  }
+
+  /* ---------- Chat engine (simulated) ---------- */
+  function appendMessage(text, who='bot'){
+    state.messages.push({who,text,ts:Date.now()}); renderMessages()
+  }
+  function appendUserMessage(text){ appendMessage(text,'user') }
+  function appendBotMessage(text){ appendMessage(text,'bot') }
+
+  function renderMessages(){
+    const box = $('messages'); box.innerHTML=''
+    state.messages.forEach(m=>{
+      const d = document.createElement('div'); d.className='msg '+(m.who==='user'?'user':'bot');
+      d.innerHTML = `<div style="font-size:13px;opacity:.9">${m.who==='user'?state.user.name:'FinBot'}</div><div style="margin-top:6px"><pre style='margin:0'>${escapeHtml(m.text)}</pre></div>`
+      box.appendChild(d)
+    })
+    box.scrollTop = box.scrollHeight
+  }
+
+  function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+  $('send').onclick = ()=>{const t=$('userInput').value.trim(); if(!t)return; appendUserMessage(t); $('userInput').value=''; setTimeout(()=>processUserQuery(t),300)}
+  $('userInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('send').click()}})
+  $('clearChat').onclick = ()=>{state.messages=[];renderMessages()}
+
+  function processUserQuery(text){
+    // lightweight NLP to detect intent
+    const q = text.toLowerCase()
+    const type = $('userType').value
+    if(/budget|save|saving|savings/.test(q)) return handleSavings(text,type)
+    if(/tax|taxes|income tax/.test(q)) return handleTaxes(text,type)
+    if(/invest|investment|stocks|mutual/.test(q)) return handleInvest(text,type)
+    if(/insight|spend|spending|habit/.test(q)) return handleInsights(text,type)
+    if(/calculate|calc|what is|how much/.test(q)) return handleCalc(text,type)
+    // fallback: generic helpful reply
+    const reply = generateTone(type,`I can help with savings, taxes, investments, budgets, and spending insights. Try: "Generate budget summary" or "How much tax will I pay on $X?"`)
+    appendBotMessage(reply)
+  }
+
+  /* ----- Intent handlers ----- */
+  function handleSavings(text,type){
+    // if user has income & categories, compute suggested saving rate
+    const income = state.income || Number($('income').value.trim()) || 0
+    const expenses = state.categories.reduce((s,c)=>s+c.amount,0)
+    const emp = income - expenses
+    let suggestion = ''
+    if(income<=0){ suggestion = generateTone(type,`I don't have your income yet. Enter your monthly income in the Budget Builder to get personalized saving recommendations.`); appendBotMessage(suggestion); return }
+    const recommendedRate = income<2000?0.15:0.2
+    const recommended = Math.max(0,income*recommendedRate)
+    suggestion = generateTone(type,`Based on your income of ${formatMoney(income)} I recommend saving approximately ${Math.round(recommendedRate*100)}% (${formatMoney(recommended)}) monthly. Current leftover after expenses: ${formatMoney(emp)}.`)
+    appendBotMessage(suggestion)
+  }
+
+  function handleTaxes(text,type){
+    // lightweight tax estimator: simple slab mock
+    const numbers = extractNumbers(text)
+    const income = numbers.length?numbers[0]:(state.income||0)
+    if(!income){ appendBotMessage(generateTone(type,'Provide your annual income (e.g. "My annual income is 45000") or set monthly income in Budget Builder.'));return }
+    const annual = income>1000 && income<1000000 && income<10000?income*12:income // guess if monthly
+    const tax = simpleTaxCalc(annual)
+    const reply = generateTone(type,`Estimated annual tax on ${formatMoney(annual)}: ${formatMoney(tax)} (this is a simplified estimator). Net after tax: ${formatMoney(annual-tax)}.`)
+    appendBotMessage(reply)
+  }
+
+  function simpleTaxCalc(annual){
+    // very simple progressive slabs (demo only)
+    let tax=0; let a=annual
+    if(a>250000) { tax += Math.min(a-250000,250000)*0.05 }
+    if(a>500000) { tax += Math.min(a-500000,500000)*0.1 }
+    if(a>1000000){ tax += (a-1000000)*0.15 }
+    return Math.round(tax)
+  }
+
+  function handleInvest(text,type){
+    const reply = generateTone(type,`Investing basics: diversify across low-cost index funds, consider an emergency fund (3-6 months), and match risk to your time horizon. If you tell me your risk tolerance and horizon (years), I can suggest an allocation.`)
+    appendBotMessage(reply)
+  }
+
+  function handleInsights(text,type){
+    // basic spending insights from categories
+    if(state.categories.length===0){ appendBotMessage(generateTone(type,'No expense data available. Add categories in Budget Builder for spending insights.'));return }
+    const total = state.categories.reduce((s,c)=>s+c.amount,0)
+    const sorted = [...state.categories].sort((a,b)=>b.amount-a.amount)
+    const top = sorted[0]
+    const percent = Math.round((top.amount/total)*100)
+    const advice = generateTone(type,`Your top spending category is ${top.name} (${formatMoney(top.amount)} — ${percent}% of expenses). Consider reducing it by 10-20% to free up funds for savings or investments.`)
+    appendBotMessage(advice)
+  }
+
+  function handleCalc(text,type){
+    // try to evaluate simple math expressions safely
+    const expr = text.replace(/[^0-9+\-*/(). %]/g,'').replace('%','/100')
+    try{ if(!expr) throw 'no expr'; const val = Function('return ('+expr+')')(); appendBotMessage(generateTone(type,`Result: ${val}`)) }catch(e){ appendBotMessage(generateTone(type,'I could not parse that calculation. Use simple expressions like "1000*0.2" or "(500+300)/2"')) }
+  }
+
+  /* ---------- Utilities ---------- */
+  function extractNumbers(s){ const m = s.match(/\d+[\,\d]*(\.\d+)?/g); if(!m) return []; return m.map(x=>Number(x.replace(/,/g,''))) }
+
+  function generateTone(type,text){
+    // demographic-aware wording (simple)
+    if(type==='student'){
+      return `Hey! ${text}\n\nQuick tip: start small and automate your savings.`
+    }
+    return `Hello — ${text}\n\nTip: review your budget monthly and set 1 financial goal.`
+  }
+
+  /* ---------- Quick tools UI ---------- */
+  $('calcBtn').onclick = ()=>{
+    const q = prompt('Enter calculation (e.g. (1200-300)*0.2):')
+    if(!q) return; const r = Function('return ('+q.replace(/[^0-9+\-*/(). ]/g,'')+')')(); $('toolOutput').textContent = 'Calc: '+r
+  }
+  $('taxBtn').onclick = ()=>{ const q = prompt('Enter annual or monthly income (numbers):'); if(!q) return; const n=Number(q); const annual = n<10000? n*12: n; $('toolOutput').textContent = 'Estimated tax: '+formatMoney(simpleTaxCalc(annual)) }
+  $('insightsBtn').onclick = ()=>{ handleInsights('', $('userType').value); }
+
+  /* ---------- Persistence & Import/Export ---------- */
+  function saveProfile(){
+    const user = {name:state.user.name,email:state.user.email,type:$('userType').value}
+    localStorage.setItem('pf_user', JSON.stringify({user, income:state.income, categories:state.categories}))
+    alert('Saved to browser localStorage')
+  }
+  function loadProfile(){
+    const raw = localStorage.getItem('pf_user'); if(!raw) return false; try{ const d = JSON.parse(raw); state.user = d.user||state.user; state.income = d.income||0; state.categories = d.categories||[]; applyProfileToUI(); return true }catch(e){return false}
+  }
+
+  $('saveProfile').onclick = ()=>{ state.user.name = prompt('Name:', state.user.name)||state.user.name; state.user.email = prompt('Email:', state.user.email)||state.user.email; saveProfile(); applyProfileToUI() }
+  $('loadDemo').onclick = ()=>{ state.user = {name:'Alex Morgan', email:'alex@example.com', type:'professional'}; state.income=4500; state.categories=[{name:'Rent',amount:1500},{name:'Food',amount:400},{name:'Transport',amount:200},{name:'Entertainment',amount:250}]; applyProfileToUI(); renderCats(); $('income').value=state.income }
+
+  function applyProfileToUI(){ $('username').textContent = state.user.name; $('useremail').textContent = state.user.email||'No email provided'; $('avatar').textContent = state.user.name.split(' ').map(n=>n[0]).slice(0,2).join(''); $('userType').value = state.user.type }
+
+  $('export').onclick = ()=>{
+    const blob = new Blob([JSON.stringify({user:state.user,income:state.income,categories:state.categories},null,2)],{type:'application/json'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='pf-profile.json'; a.click(); URL.revokeObjectURL(url);
+  }
+  $('importBtn').onclick = ()=>$('importFile').click()
+  $('importFile').addEventListener('change',e=>{
+    const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = ev=>{ try{ const d = JSON.parse(ev.target.result); state.user = d.user||state.user; state.income = d.income||0; state.categories = d.categories||[]; applyProfileToUI(); renderCats(); $('income').value=state.income; alert('Imported!') }catch(err){alert('Invalid file')} }; r.readAsText(f)
+  })
+
+  // initial
+  loadProfile(); applyProfileToUI(); renderCats();
+
+  /* ---------- Where to plug IBM Watson (notes) ---------- */
+  /*
+    NOTE: This single-file demo runs entirely in the browser and does NOT call IBM Watson or other generative AI services.
+    To integrate IBM Watson / IBM Cloud generative models you MUST:
+      1) Create a server-side endpoint (Node/Python) that holds your IBM API key securely (do NOT embed API keys in client-side code).
+      2) From the client (this app), send user messages to your server endpoint. The server will forward them to IBM Watson or another model, then return the model response.
+      3) Update the client-side function `processUserQuery` to call your server API and display responses from the real model.
+
+    Example server call (pseudo):
+      fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message, userProfile})})
+        .then(r=>r.json()).then(res=>appendBotMessage(res.reply))
+
+    This ensures your credentials remain secure and you can comply with IBM's usage and rate limits.
+  */
+
+  </script>
+</body>
+</html>
